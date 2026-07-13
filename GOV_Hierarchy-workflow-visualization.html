@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>行政隶属关系校验 Workflow</title>
+  <!-- SECTION: styles START -->
+  <style>
+    :root { --ink:#1e293b; --muted:#64748b; --line:#dbe3ef; --paper:#fff; --bg:#f6f8fc; --blue:#2563eb; --blue-bg:#eff6ff; --green:#15803d; --green-bg:#f0fdf4; --amber:#b45309; --amber-bg:#fffbeb; --red:#b91c1c; --red-bg:#fef2f2; --violet:#6d28d9; --shadow:0 8px 26px rgba(15,23,42,.08); }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; color:var(--ink); background:var(--bg); font:15px/1.65 "Microsoft YaHei","PingFang SC",system-ui,sans-serif; }
+    a { color:var(--blue); }
+    code { padding:.08rem .35rem; border-radius:4px; background:#eaf0fa; font-family:Consolas,monospace; font-size:.9em; }
+    .shell { max-width:1320px; margin:0 auto; padding:0 28px 56px; }
+    header { padding:54px 0 32px; }
+    .eyebrow { margin:0 0 10px; color:var(--blue); font-size:.78rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
+    h1 { margin:0; font-size:clamp(2rem,4vw,3.4rem); line-height:1.15; letter-spacing:-.04em; }
+    .lede { max-width:820px; margin:18px 0 0; color:var(--muted); font-size:1.08rem; }
+    .layout { display:grid; grid-template-columns:220px minmax(0,1fr); gap:30px; }
+    nav { position:sticky; top:22px; align-self:start; padding:14px; border:1px solid var(--line); border-radius:14px; background:rgba(255,255,255,.82); box-shadow:var(--shadow); }
+    nav strong { display:block; padding:4px 8px 8px; font-size:.78rem; letter-spacing:.08em; color:var(--muted); }
+    nav a { display:block; padding:7px 8px; color:var(--muted); text-decoration:none; border-radius:7px; }
+    nav a:hover,nav a.active { color:var(--blue); background:var(--blue-bg); font-weight:700; }
+    main { min-width:0; }
+    section { scroll-margin-top:24px; margin-bottom:28px; padding:28px; border:1px solid var(--line); border-radius:18px; background:var(--paper); box-shadow:var(--shadow); }
+    h2 { margin:0 0 8px; font-size:1.4rem; }
+    h3 { margin:22px 0 8px; font-size:1.05rem; }
+    .section-note { margin:0 0 22px; color:var(--muted); }
+    .tag { display:inline-flex; align-items:center; margin-left:8px; padding:2px 8px; border-radius:999px; background:#eef2ff; color:var(--violet); font-size:.75rem; font-weight:700; vertical-align:middle; }
+    .flow { display:flex; flex-wrap:wrap; align-items:center; gap:9px; margin:20px 0 8px; }
+    .node { flex:1 1 135px; min-width:115px; padding:12px; border:1px solid var(--line); border-radius:10px; background:#fff; text-align:center; font-weight:700; }
+    a.node { text-decoration:none; }
+    .node.primary { border-color:#93c5fd; background:var(--blue-bg); color:#1d4ed8; }
+    .node.govern { border-color:#c4b5fd; background:#f5f3ff; color:#6d28d9; }
+    .arrow { color:#94a3b8; font-size:1.3rem; }
+    .callout { padding:14px 16px; border-left:4px solid var(--blue); border-radius:0 10px 10px 0; background:var(--blue-bg); }
+    .callout strong { color:#1d4ed8; }
+    .metrics { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:18px; }
+    .metric { padding:14px; border-radius:10px; background:#f8fafc; }
+    .metric b { display:block; color:var(--blue); font-size:1.35rem; }
+    .stages { display:grid; gap:12px; }
+    details { overflow:hidden; border:1px solid var(--line); border-radius:12px; background:#fff; }
+    summary { display:flex; align-items:center; gap:10px; padding:15px 17px; cursor:pointer; font-weight:800; }
+    summary::marker { color:var(--blue); }
+    .stage-id { display:inline-grid; place-items:center; width:26px; height:26px; color:#1d4ed8; border-radius:50%; background:var(--blue-bg); font-size:.78rem; }
+    .stage-body { padding:0 17px 18px 53px; border-top:1px solid #eef2f7; }
+    .mini-flow { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:13px 0; }
+    .mini { padding:5px 9px; border-radius:6px; background:#f1f5f9; font-size:.84rem; }
+    .example { margin-top:12px; padding:12px; border:1px dashed #b8c7db; border-radius:8px; background:#fafcff; white-space:pre-wrap; font:13px/1.65 Consolas,"Microsoft YaHei",monospace; }
+    table { width:100%; border-collapse:collapse; margin-top:14px; font-size:.92rem; }
+    th,td { padding:10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:#475569; background:#f8fafc; font-size:.82rem; }
+    .table-scroll { overflow-x:auto; margin-top:14px; }
+    .table-scroll table { min-width:980px; margin-top:0; }
+    .decision-table { table-layout:fixed; }
+    .decision-table th,.decision-table td { padding:8px 7px; }
+    .decision-table th:nth-child(1),.decision-table td:nth-child(1) { width:64px; }
+    .decision-table th:nth-child(2),.decision-table td:nth-child(2) { width:285px; }
+    .decision-table th:nth-child(3),.decision-table td:nth-child(3) { width:90px; white-space:nowrap; }
+    .decision-flow { display:grid; gap:6px; margin:14px 0; }
+    .decision-step { width:48%; margin-inline:auto; padding:11px; border:1px solid var(--line); border-radius:10px; background:#f8fafc; text-align:center; }
+    .decision-step b { font-size:.9rem; }
+    .decision-branches { display:flex; flex-wrap:wrap; gap:8px; }
+    .branch { padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; font-size:.86rem; line-height:1.35; }
+    .branch:not(.pass-branch):not(.weak-branch):not(.fail-branch) { border-color:#94a3b8; box-shadow:2px 2px 0 #cbd5e1; }
+    .branch.pass-branch { color:var(--green); background:var(--green-bg); }
+    .branch.weak-branch { color:var(--amber); background:var(--amber-bg); }
+    .branch.fail-branch { color:var(--red); background:var(--red-bg); }
+    .flow-transition { position:relative; display:flex; align-items:center; justify-content:center; min-height:64px; }
+    .flow-transition .decision-branches { position:static; }
+    .flow-transition .yes-branch { position:absolute; top:50%; right:calc(50% + 24px); max-width:calc(50% - 40px); text-align:right; transform:translateY(-50%); }
+    .flow-transition .no-branch { position:absolute; top:50%; left:calc(50% + 24px); max-width:calc(50% - 40px); text-align:left; transform:translateY(-50%); }
+    .flow-arrow { color:#64748b; font-size:1.15rem; font-weight:800; line-height:20px; text-align:center; }
+    .decision-final { display:flex; flex-wrap:wrap; gap:8px; padding:14px; border:2px solid #64748b; border-radius:10px; background:#fff; }
+    .status { display:inline-block; padding:2px 7px; border-radius:999px; font-weight:700; font-size:.78rem; }
+    .pass { color:var(--green); background:var(--green-bg); } .weak-status { color:var(--amber); background:var(--amber-bg); } .fail-status { color:var(--red); background:var(--red-bg); }
+    .governance { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-top:16px; }
+    .governance .node { min-height:95px; display:flex; flex-direction:column; justify-content:center; }
+    .gate { border-color:#fcd34d; background:var(--amber-bg); }
+    .collab { padding:17px; border:1px dashed #94a3b8; border-radius:12px; background:#fbfdff; }
+    .collab ul { margin:8px 0 0; padding-left:20px; }
+    footer { padding:0 0 22px; color:var(--muted); font-size:.85rem; }
+    @media (max-width:900px) { .layout { grid-template-columns:1fr; } nav { display:none; } .governance { grid-template-columns:1fr; } .metrics { grid-template-columns:1fr; } }
+  </style>
+  <!-- SECTION: styles END -->
+</head>
+<body>
+  <div class="shell">
+    <!-- SECTION: hero START -->
+    <header id="overview">
+      <p class="eyebrow">Workflow Analysis · Hand-off Guide</p>
+      <h1>行政隶属关系校验 Workflow</h1>
+      <p class="lede">从原始组织链路到可审计结论，再到人工核验、回测和稳定模板治理的完整工作闭环。</p>
+    </header>
+    <!-- SECTION: hero END -->
+
+    <div class="layout">
+      <!-- SECTION: navigation START -->
+      <nav aria-label="页面目录">
+        <strong>快速导航</strong>
+        <a href="#overview">总览</a>
+        <a href="#stages">阶段展开</a>
+      </nav>
+      <!-- SECTION: navigation END -->
+
+      <main>
+        <!-- SECTION: overview-flow START -->
+        <section aria-labelledby="overview-title">
+          <h2 id="overview-title">完整闭环</h2>
+          <p class="section-note">每个节点均对应下方同编号的阶段说明。阶段 08 更新的稳定模板成为下一轮阶段 01 的输入。</p>
+          <div class="flow" data-topic="complete-workflow">
+            <a class="node primary" href="#stage-01">01 输入与预检</a><span class="arrow">→</span>
+            <a class="node primary" href="#stage-02">02 读取参考数据</a><span class="arrow">→</span>
+            <a class="node primary" href="#stage-03">03 标准化记录</a><span class="arrow">→</span>
+            <a class="node primary" href="#stage-04">04 构建模板索引</a><span class="arrow">→</span>
+            <a class="node primary" href="#stage-05">05 拆边与去重</a><span class="arrow">→</span>
+            <a class="node primary" href="#stage-06">06 唯一边校验</a><span class="arrow">→</span>
+            <a class="node primary" href="#stage-07">07 聚合输出与验收</a><span class="arrow">→</span>
+            <a class="node govern" href="#stage-08">08 人工核验与模板治理</a>
+          </div>
+        </section>
+        <!-- SECTION: overview-flow END -->
+
+        <!-- SECTION: stages START -->
+        <section id="stages" aria-labelledby="stages-title">
+          <h2 id="stages-title">阶段展开</h2>
+          <p class="section-note">每个阶段同时给出输入、规则、输出与一条静态示例。点击标题展开。</p>
+          <div class="stages" data-topic="stages">
+            <details id="stage-01" open>
+              <summary><span class="stage-id">01</span>输入与预检</summary>
+              <div class="stage-body">
+                <div class="mini-flow"><span class="mini">CSV/XLSX</span>→<span class="mini">必填列</span>→<span class="mini">行政区划</span>→<span class="mini">稳定模板</span>→<span class="mini">输出目录</span></div>
+                <div class="example">✓ 目标文件可读　✓ 必填列齐全　✓ 模板可读　✓ 输出目录可写
+→ preflight = pass，进入常规校验</div>
+              </div>
+            </details>
+            <details id="stage-02">
+              <summary><span class="stage-id">02</span>读取参考数据</summary>
+              <div class="stage-body">
+                <div class="mini-flow"><span class="mini">目标 CSV/XLSX</span>→<span class="mini">行政区划 CSV</span>→<span class="mini">稳定模板 CSV</span></div>
+                <p>读取目标输入、行政区划和稳定隶属关系模板。输入保留行号和工作表；行政区划用于地名解析，模板用于后续建立关系索引。</p>
+                <div class="example">输入：贵州.csv
+行政区划：中国行政区划-行政级别结果.csv
+稳定模板：北京-隶属关系模板.csv</div>
+              </div>
+            </details>
+            <details id="stage-03">
+              <summary><span class="stage-id">03</span>标准化记录</summary>
+              <div class="stage-body">
+                <div class="mini-flow"><span class="mini">级别列构造链路</span>→<span class="mini">行政区路径</span>→<span class="mini">名称抽象</span>→<span class="mini">类型/后缀/键</span></div>
+                <p>依行政级别列构造父子节点链，生成 <code>SystemKey</code> 与 <code>chain_key</code>；行政区候选按更深层级、名称更长、正式名优先选择。地名替换为占位符，常用简称统一，再识别单位类型和后缀。</p>
+                <div class="example">云岩区市场监管局
+→ 云岩区 / 贵州省-贵阳市-云岩区
+→ {{省级行政区}}{{县级行政区}}市场监督管理局
+→ 单位类型：市场监管局；SystemKey：中共中央</div>
+              </div>
+            </details>
+            <details id="stage-04">
+              <summary><span class="stage-id">04</span>构建模板索引</summary>
+              <div class="stage-body">
+                <div class="mini-flow"><span class="mini">精确边索引</span>→<span class="mini">子模板允许父集合</span>→<span class="mini">类型弱匹配规则</span>→<span class="mini">系统索引</span></div>
+                <p>稳定模板被转换为内存索引：精确父子边用于强匹配，子模板反查用于识别父模板不符，父模板+子单位类型用于弱匹配，系统索引用于前置系统检查。</p>
+                <div class="example">精确边索引键：
+SystemKey + 父单位模板 + 子单位模板
+→ 用于后续唯一边的快速关系判断</div>
+              </div>
+            </details>
+            <details id="stage-05">
+              <summary><span class="stage-id">05</span>拆边与唯一边去重</summary>
+              <div class="stage-body">
+                <div class="mini-flow"><span class="mini">chain_key</span>→<span class="mini">相邻节点成边</span>→<span class="mini">edge_key 去重</span>→<span class="mini">校验一次</span>→<span class="mini">回填多链</span></div>
+                <p><code>edge_key</code> 包含系统、父子行政区路径、关系类型、父子级别、抽象模板与单位类型；并非“类型相同”就可复用。语义一致的边只校验一次，保证相同关系得到一致结果。</p>
+                <div class="example">链路 A：省政府 → 市政府 → 区政府
+链路 B：省政府 → 市政府 → 区政府办公室
+共享边：省政府 → 市政府（只校验一次，结果回填 A、B）</div>
+              </div>
+            </details>
+            <details id="stage-06">
+              <summary><span class="stage-id">06</span>唯一边关系校验</summary>
+              <div class="stage-body">
+                <div class="mini-flow"><span class="mini">系统/行政区前置</span>→<span class="mini">精确边</span>→<span class="mini">等价边</span>→<span class="mini">父模板反查</span>→<span class="mini">类型规则</span></div>
+                <p>精确不命中时才尝试安全等价；如果子模板存在但当前父模板不在允许集合，输出 <code>PARENT_TEMPLATE_MISMATCH</code>，不会退化成弱匹配。</p>
+                <div class="example">{{省级行政区}}{{县级行政区}}人民政府
+→ {{省级行政区}}{{县级行政区}}市场监督管理局
+→ 精确命中：通过</div>
+              </div>
+            </details>
+            <details id="stage-07">
+              <summary><span class="stage-id">07</span>聚合输出与验收</summary>
+              <div class="stage-body">
+                <div class="mini-flow"><span class="mini">边级结果</span>→<span class="mini">最严重结论聚合</span>→<span class="mini">CSV/XLSX</span>→<span class="mini">JSON/MD 汇总</span>→<span class="mini">输出验收</span></div>
+                <p>任一硬失败边使链路“不通过”；无硬失败但有类型弱匹配为“弱通过”；其余为“通过”。写出后还要验证文件存在、非空与关键字段齐全。</p>
+                <div class="example">边 1：精确匹配（通过）
+边 2：类型弱匹配（弱通过）
+→ 整条链路：弱通过</div>
+                <!-- SECTION: outputs START -->
+                <h3>交付物：谁该看什么，如何用于下一轮</h3>
+                <table data-topic="deliverables">
+                  <thead><tr><th>交付物</th><th>核心内容</th><th></thead>
+                  <tbody>
+                    <tr><td><code>&lt;省名&gt;-校验结果.xlsx</code></td><td>通过 / 弱通过 / 不通过三个sheet页</tr>
+                    <tr><td><code>本次运行 summary.md</code></td><td>run ID、行/链/边规模、分布统计与产物清单</tr>
+                    <tr><td><code>preflight / failure JSON</code></td><td>运行条件或失败阶段、错误和恢复线索</tr>
+                  </tbody>
+                </table>
+                <!-- SECTION: outputs END -->
+              </div>
+            </details>
+            <details id="stage-08">
+              <summary><span class="stage-id">08</span>人工核验与模板治理</summary>
+              <div class="stage-body">
+                <p>对失败和弱通过项进行人工核验后，只有被明确批准且经回测证明安全的关系，才能进入稳定模板。</p>
+                <div class="mini-flow" data-topic="governance-loop">
+                  <span class="mini">人工核验</span>→
+                  <span class="mini">approved 筛选</span>→
+                  <span class="mini">候选规则摘要</span>→
+                  <span class="mini">回测对比</span>→
+                  <span class="mini">落模板门槛</span>
+                </div>
+              </div>
+            </details>
+          </div>
+        </section>
+        <!-- SECTION: stages END -->
+      </main>
+    </div>
+  </div>
+
+  <!-- SECTION: interaction-script START -->
+  <script>
+    const navLinks = document.querySelectorAll("nav a");
+    const targets = [...navLinks].map(link => document.querySelector(link.getAttribute("href"))).filter(Boolean);
+    const observer = new IntersectionObserver(entries => {
+      const visible = entries.filter(entry => entry.isIntersecting).sort((a,b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (!visible) return;
+      navLinks.forEach(link => link.classList.toggle("active", link.getAttribute("href") === "#" + visible.target.id));
+    }, { rootMargin:"-20% 0px -65% 0px", threshold:[0,.2,.5] });
+    targets.forEach(target => observer.observe(target));
+  </script>
+  <!-- SECTION: interaction-script END -->
+</body>
+</html>
